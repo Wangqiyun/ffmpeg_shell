@@ -1,0 +1,2 @@
+# ffmpeg_shell
+Android使用ffmpeg shell命令进行文件编辑的demo
