@@ -1,4 +1,4 @@
-package com.process.ffmpeg_shell.terminal.common;
+package com.process.ffmpeg_shell.utils;
 
 import com.process.ffmpeg_shell.log.Logger;
 
@@ -12,8 +12,8 @@ import java.io.OutputStream;
 /**
  * Created by kerwin on 2018/11/14
  */
-public class FunTerminalFileDispose {
-    private static final String TAG = "FunTerminalFileDispose";
+public class FileStorageDisposeUtils {
+    private static final String TAG = "FileStorageDisposeUtils";
 
     /**
      * 将输出流内的文件保存到指定目录下
@@ -21,7 +21,7 @@ public class FunTerminalFileDispose {
      * @param path 保存到指定目录下
      * @return 如果返回true表示保存成功,反之表示保存失败
      * */
-    public boolean saveInputStreamToCache(InputStream stream, String path) throws IOException {
+    public static boolean saveInputStreamToCache(InputStream stream, String path) throws IOException {
         File file = createFile(path);
 
         if(file == null) {
@@ -57,11 +57,17 @@ public class FunTerminalFileDispose {
      * 创建一个新文件
      * @param path 指定裁剪文件路径
      * */
-    private File createFile(String path) throws IOException {
+    private static File createFile(String path) throws IOException {
         File file = new File(path);
         if(file.exists()) {
             Logger.i(TAG, "createFile() file exists.");
             return file;
+        }
+
+        File parentFile = file.getParentFile();
+        if(parentFile != null && !parentFile.exists()) {
+            boolean isMkDirs = parentFile.mkdirs();
+            Logger.i(TAG, "createFile() isMkDirs:" + isMkDirs);
         }
 
         boolean isNewFile = file.createNewFile();

@@ -2,8 +2,8 @@ package com.process.ffmpeg_shell;
 
 import android.annotation.SuppressLint;
 import android.os.Bundle;
-import android.os.Environment;
 import android.support.v7.app.AppCompatActivity;
+import android.text.TextUtils;
 import android.view.View;
 import android.widget.ImageView;
 
@@ -23,7 +23,6 @@ public class DemoCommandActivity extends AppCompatActivity implements
 
     private long mLoadImageSession = 0;
     private ImageView mLoadImageView = null;
-    private String mFilePath = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -40,12 +39,24 @@ public class DemoCommandActivity extends AppCompatActivity implements
         findViewById(R.id.resolution).setOnClickListener(this);
     }
 
-    @SuppressLint("StaticFieldLeak")
     @Override
-    public void onCommandProviderFinish(long session) {
-        if(mLoadImageSession == session) {
-            ImageViewLoadUtils.loadImageView(mLoadImageView, mFilePath);
+    public void onCommandProviderFinish(long session, Bundle extra) {
+        if(mLoadImageSession != session) {
+            return;
         }
+
+        if(extra == null) {
+            Logger.w(TAG, "onCommandProviderFinish() extra not is null.");
+            return;
+        }
+
+        String filePath = extra.getString(FFmpegCommandProvider.FFmpegCommandKeys.OUTPUT);
+        if(TextUtils.isEmpty(filePath)) {
+            Logger.w(TAG, "onCommandProviderFinish() path not is empty.");
+            return;
+        }
+
+        ImageViewLoadUtils.loadImageView(mLoadImageView, filePath);
     }
 
     @Override
@@ -75,20 +86,28 @@ public class DemoCommandActivity extends AppCompatActivity implements
         if(viewId == R.id.get_ffmpeg_version) {
             mFFmpegCommandProvider.getVersion();
         } else if(viewId == R.id.get_screen_shots) {
-            String input = getSDCardFilePath("demo.mp4");
-            String output = getSDCardFilePath("demo.jpg");
+            Bundle bundle = new Bundle();
+            bundle.putString(FFmpegCommandProvider.FFmpegCommandKeys.INPUT, getSDCardFilePath("demo.mp4"));
+            bundle.putString(FFmpegCommandProvider.FFmpegCommandKeys.OUTPUT, getSDCardFilePath("demo.jpg"));
+            bundle.putString(FFmpegCommandProvider.FFmpegCommandKeys.TIME, "00:00:02");
 
-            mLoadImageSession = mFFmpegCommandProvider.generateScreenShots(input, output, "00:00:02");
+            mLoadImageSession = mFFmpegCommandProvider.generateScreenShots(bundle);
         } else if(viewId == R.id.resolution) {
-            String input = getSDCardFilePath("demo.mp4");
-            String output = getSDCardFilePath("resolution.mp4");
+            Bundle bundle = new Bundle();
+            bundle.putString(FFmpegCommandProvider.FFmpegCommandKeys.INPUT, getSDCardFilePath("demo.mp4"));
+            bundle.putString(FFmpegCommandProvider.FFmpegCommandKeys.OUTPUT, getSDCardFilePath("resolution.mp4"));
+            bundle.putString(FFmpegCommandProvider.FFmpegCommandKeys.RESOLUTION, "800x480");
 
-            mFFmpegCommandProvider.compressionVideoResolution(input, output, "800x480");
+            mFFmpegCommandProvider.compressionVideoResolution(bundle);
         }
     }
 
     public String getSDCardFilePath(String fileName) {
-        File sdcardFile = Environment.getExternalStorageDirectory();
-        return sdcardFile + File.separator + fileName;
+        if(mFFmpegCommandProvider == null) {
+            Logger.w(TAG, "getSDCardFilePath() provider not is null.");
+            return "";
+        }
+
+        return mFFmpegCommandProvider.getProviderCacheDir(this) + File.separator + fileName;
     }
 }

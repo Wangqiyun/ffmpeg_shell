@@ -1,4 +1,4 @@
-package com.process.ffmpeg_shell.terminal.common;
+package com.process.ffmpeg_shell.terminal;
 
 import com.process.ffmpeg_shell.log.Logger;
 

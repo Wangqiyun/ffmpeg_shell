@@ -10,7 +10,7 @@ import android.text.TextUtils;
 
 import com.process.ffmpeg_shell.log.Logger;
 import com.process.ffmpeg_shell.terminal.IInstallFunTerminalTask;
-import com.process.ffmpeg_shell.terminal.common.ShellCommand;
+import com.process.ffmpeg_shell.terminal.ShellCommand;
 import com.process.ffmpeg_shell.utils.MainHandlerUtils;
 
 import java.lang.ref.WeakReference;
@@ -30,6 +30,7 @@ public abstract class AbsCommandProvider implements
 
     private static final String COMMAND_KEY = "command_key";
     private static final String COMMAND_SESSION_KEY = "command_session_key";
+    private static final String COMMAND_PARAM = "command_param";
     private static final int COMMAND_WHAT = 1001;
 
     private List<String> mCommandList = null;
@@ -59,6 +60,8 @@ public abstract class AbsCommandProvider implements
             terminalTask.setOnInstallFunTerminalListener(this);
             terminalTask.initialized();
         }
+
+        initialized(context);
     }
 
     @Override
@@ -104,9 +107,9 @@ public abstract class AbsCommandProvider implements
 
     /**
      * 通过handler进行异步命令处理，并且是队列形式-逐条处理的
-     * @param commands 命令行参数列表
-     * */
-    protected long queueCommandExecute(ArrayList<String> commands) {
+     * @param bundle
+     * @param commands 命令行参数列表 */
+    protected long queueCommandExecute(Bundle bundle, ArrayList<String> commands) {
         if(mQueueHandler == null) {
             Logger.w(TAG, "queueCommandExecute() handler is null.");
             return 0;
@@ -119,13 +122,14 @@ public abstract class AbsCommandProvider implements
 
         long session = System.currentTimeMillis();
 
-        Bundle bundle = new Bundle();
-        bundle.putLong(COMMAND_SESSION_KEY, session);
-        bundle.putStringArrayList(COMMAND_KEY, commands);
+        Bundle extra = new Bundle();
+        extra.putLong(COMMAND_SESSION_KEY, session);
+        extra.putStringArrayList(COMMAND_KEY, commands);
+        extra.putBundle(COMMAND_PARAM, bundle);
 
         Message message = new Message();
         message.what = COMMAND_WHAT;
-        message.setData(bundle);
+        message.setData(extra);
         mQueueHandler.sendMessage(message);
         return session;
     }
@@ -165,18 +169,20 @@ public abstract class AbsCommandProvider implements
         Bundle bundle = message.getData();
         ArrayList<String> commandList = bundle.getStringArrayList(COMMAND_KEY);
         long session = bundle.getLong(COMMAND_SESSION_KEY);
+        Bundle extra = bundle.getBundle(COMMAND_PARAM);
 
         if(message.what == COMMAND_WHAT) {
-            executeCommand(commandList, session);
+            executeCommand(commandList, extra, session);
         }
     }
 
     /**
      * 执行命令行处理
      * @param commands 命令行参数列表
+     * @param extra 请求参数值
      * @param session 当前执行命令的session
      * */
-    private void executeCommand(ArrayList<String> commands, long session) {
+    private void executeCommand(ArrayList<String> commands, Bundle extra, long session) {
         if(!isTerminalSupportExecute) {
             Logger.w(TAG, "queueCommandExecute() current not support execute.");
             return;
@@ -191,15 +197,16 @@ public abstract class AbsCommandProvider implements
         if(!isExecSuccess) {
             Logger.w(TAG, "executeCommand() command fail.");
         } else {
-            notifyCommandProviderFinish(session);
+            notifyCommandProviderFinish(session, extra);
         }
     }
 
     /**
      * 通知命令行处理完毕时触发回调
      * @param session 命令行会话id值
+     * @param extra 请求参数值
      * */
-    private void notifyCommandProviderFinish(final long session) {
+    private void notifyCommandProviderFinish(final long session, final Bundle extra) {
         if(mCommandProviderListenerWeakReference == null) {
             Logger.w(TAG, "notifyCommandProviderFinish() listener reference is null.");
             return;
@@ -212,7 +219,7 @@ public abstract class AbsCommandProvider implements
                 if(listener == null) {
                     Logger.w(TAG, "notifyCommandProviderFinish() listener is null.");
                 } else {
-                    listener.onCommandProviderFinish(session);
+                    listener.onCommandProviderFinish(session, extra);
                 }
             }
         });
@@ -224,6 +231,17 @@ public abstract class AbsCommandProvider implements
      * @return 返回功能终端安装任务对象
      * */
     public abstract IInstallFunTerminalTask generateInstallFunTerminalTask(Context context);
+
+    /**
+     * 各模块进行自身的初始化工作
+     * @param context 内容上下文
+     * */
+    protected abstract void initialized(Context context);
+
+    /**
+     * 得到当前模块缓存目录(一般为sdcard路径)
+     * */
+    public abstract String getProviderCacheDir(Context context);
 
     /**
      * 命令线程处理实现类(保证命令在同一线程下进行,避免异步导致命令不按照队列方式走)
@@ -260,8 +278,9 @@ public abstract class AbsCommandProvider implements
         /**
          * 命令执行完成时触发回调
          * @param session 执行操作的会话值
+         * @param extra 请求参数值
          * */
-        void onCommandProviderFinish(long session);
+        void onCommandProviderFinish(long session, Bundle extra);
 
         /**
          * 命令执行执行中触发回调
